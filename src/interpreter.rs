@@ -30,7 +30,7 @@ impl <'a, T: Executer> Interpreter<'a, T> {
         let mut reader = BufReader::new(file);
         let mut contents = String::new();
         reader.read_to_string(&mut contents)?;
-        self.run(contents)?;
+        self.run(contents, false)?;
         Ok(())
     }
 
@@ -42,14 +42,27 @@ impl <'a, T: Executer> Interpreter<'a, T> {
             if line == "exit" {
                 break;
             }
-            self.run(line)?;
+            self.run(line, true)?;
         }
         Ok(())
     }
 
-    fn run(&mut self, source: String) -> Result<(), Error> {
-        self.executer.run(source)?;
-        Ok(())
+    fn run(&mut self, source: String, ignore_interpreter_error: bool) -> Result<(), Error> {
+        if let Err(err) = self.executer.run(source) {
+            match err {
+                Error::InterpreterError{..} => {
+                    self.output.write_all(format!("{}", err).as_bytes()).map_err(Error::IOError)?;
+                    if !ignore_interpreter_error {
+                        Err(err)
+                    } else {
+                        Ok(())
+                    }
+                },
+                _ => Err(err),
+            }
+        } else {
+            Ok(())
+        }
     }
 }
 

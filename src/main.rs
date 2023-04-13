@@ -12,6 +12,9 @@ fn main() {
             error::Error::InvalidParameter => {
                 std::process::exit(64);
             },
+            error::Error::InterpreterError{..} => {
+                std::process::exit(65);
+            },
             _ => {
                 eprintln!("{}", err);
                 std::process::exit(1);
