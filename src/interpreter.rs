@@ -1,4 +1,5 @@
 use std::{fs::File, io::{Read, Write, BufRead, BufReader}};
+
 use super::error::Error;
 use super::executer::Executer;
 
@@ -48,9 +49,13 @@ impl <'a, T: Executer> Interpreter<'a, T> {
     }
 
     fn run(&mut self, source: String, ignore_interpreter_error: bool) -> Result<(), Error> {
-        if let Err(err) = self.executer.run(source) {
-            match err {
-                Error::InterpreterError{..} => {
+        match self.executer.run(source) {
+            Ok(output) => {
+                self.output.write_all(&output).map_err(Error::IOError)?;
+                Ok(())
+            },
+            Err(err) => match err {
+                Error::InterpreterError => {
                     self.output.write_all(format!("{}", err).as_bytes()).map_err(Error::IOError)?;
                     if !ignore_interpreter_error {
                         Err(err)
@@ -60,8 +65,6 @@ impl <'a, T: Executer> Interpreter<'a, T> {
                 },
                 _ => Err(err),
             }
-        } else {
-            Ok(())
         }
     }
 }
@@ -73,9 +76,9 @@ mod tests {
     struct MockExecuter<'a>(&'a mut dyn Write);
 
     impl<'a> Executer for MockExecuter<'a> {
-        fn run(&mut self, source: String) -> Result<(), Error> {
+        fn run(&mut self, source: String) -> Result<Vec<u8>, Error> {
             self.0.write_all(source.as_bytes())?;
-            Ok(())
+            Ok(Vec::new())
         }
     }
 
