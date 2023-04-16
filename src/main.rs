@@ -1,6 +1,4 @@
-mod interpreter;
-mod executer;
-mod error;
+use rlox::{ interpreter, executer, error };
 
 fn main() {
     if let Err(err) = interpreter::new(
