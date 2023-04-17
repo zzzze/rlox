@@ -1,4 +1,4 @@
-use crate::token::{Token, TokenType};
+use crate::token::{Token, TokenType, Literal};
 
 pub struct Scanner {
     source: String,
@@ -24,7 +24,7 @@ impl Scanner {
             self.start = self.current;
             self.scan_token();
         }
-        self.tokens.push(Token::new(TokenType::EOF, "".to_string(), "".to_string(), self.line));
+        self.tokens.push(Token::new(TokenType::EOF, "".to_string(), Literal::Nil, self.line));
         self.tokens.clone()
     }
 

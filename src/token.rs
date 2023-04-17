@@ -22,16 +22,39 @@ pub enum TokenType {
     EOF
 }
 
+pub trait Object: std::fmt::Debug {
+    fn box_clone(&self) -> Box<dyn Object>;
+}
+
+impl Clone for Box<dyn Object> {
+    fn clone(&self) -> Box<dyn Object> {
+        self.box_clone()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Literal {
+    String(String),
+    Boolean(bool),
+    Number(f64),
+    Nil,
+}
+
+pub enum Value {
+    Literal(Literal),
+    Object(Box<dyn Object>),
+}
+
 #[derive(Debug, Clone)]
 pub struct Token {
     token_type: TokenType,
     lexeme: String,
-    literal: String,
+    literal: Literal,
     line: u32,
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, lexeme: String, literal: String, line: u32) -> Token {
+    pub fn new(token_type: TokenType, lexeme: String, literal: Literal, line: u32) -> Token {
         Token {
             token_type,
             lexeme,
