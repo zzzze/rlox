@@ -1,36 +1,36 @@
-use std::io::Write;
+use std::{io::Write, rc::Rc, sync::Mutex};
 use super::error::{ErrorReporter, Error};
 
 pub trait Executer {
-    fn run(&mut self, source: String) -> Result<Vec<u8>, Error>;
+    fn run(&mut self, source: String) -> Result<(), Error>;
 }
 
-pub struct EvalExecuter {
+pub struct EvalExecuter<'a> {
     had_error: bool,
-    output_cache: Vec<u8>,
+    output: Rc<Mutex<&'a mut dyn Write>>,
 }
 
-impl EvalExecuter {
-    pub fn new() -> Self {
+impl<'a> EvalExecuter<'a> {
+    pub fn new(output: Rc<Mutex<&'a mut dyn Write>>) -> Self {
         Self {
             had_error: false,
-            output_cache: Vec::new(),
+            output,
         }
     }
 }
 
-impl Executer for EvalExecuter {
-    fn run(&mut self, source: String) -> Result<Vec<u8>, Error> {
+impl<'a> Executer for EvalExecuter<'a> {
+    fn run(&mut self, source: String) -> Result<(), Error> {
         println!("{}", source);
-        Ok(self.output_cache.clone())
+        Ok(())
     }
 }
 
-impl ErrorReporter for EvalExecuter {
+impl<'a> ErrorReporter for EvalExecuter<'a> {
     fn report(&mut self, err: Error) -> Result<(), Error> {
         match err {
             Error::ParseError{..} => {
-                self.output_cache.write_all(format!("{}", err).as_bytes()).map_err(Error::IOError)?;
+                self.output.lock().unwrap().write_all(format!("{}", err).as_bytes()).map_err(Error::IOError)?;
                 self.had_error = true;
                 Ok(())
             },
