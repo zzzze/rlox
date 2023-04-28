@@ -1,8 +1,8 @@
 use std::{io::Write, rc::Rc, sync::Mutex};
-use super::error::{ErrorReporter, Error};
+use super::error::{ErrorReporter, LoxError};
 
 pub trait Executer {
-    fn run(&mut self, source: String) -> Result<(), Error>;
+    fn run(&mut self, source: String) -> Result<(), LoxError>;
 }
 
 pub struct EvalExecuter<'a> {
@@ -20,17 +20,20 @@ impl<'a> EvalExecuter<'a> {
 }
 
 impl<'a> Executer for EvalExecuter<'a> {
-    fn run(&mut self, source: String) -> Result<(), Error> {
-        println!("{}", source);
+    fn run(&mut self, source: String) -> Result<(), LoxError> {
+        let mut output = self.output.lock().unwrap();
+        output.write_all(source.as_bytes())?;
+        output.write_all(b"\n")?;
+        output.flush()?;
         Ok(())
     }
 }
 
 impl<'a> ErrorReporter for EvalExecuter<'a> {
-    fn report(&mut self, err: Error) -> Result<(), Error> {
+    fn report(&mut self, err: LoxError) -> Result<(), LoxError> {
         match err {
-            Error::ParseError{..} => {
-                self.output.lock().unwrap().write_all(format!("{}", err).as_bytes()).map_err(Error::IOError)?;
+            LoxError::ParseError{..} => {
+                self.output.lock().unwrap().write_all(format!("{}", err).as_bytes())?;
                 self.had_error = true;
                 Ok(())
             },

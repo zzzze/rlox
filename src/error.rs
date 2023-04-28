@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum LoxError {
     #[error("Invalid parameter")]
     InvalidParameter,
     #[error("[line {line}] Error {where_}: {message}")]
@@ -10,12 +10,12 @@ pub enum Error {
         where_: String,
         message: String,
     },
-    #[error("Interpreter error")]
-    InterpreterError,
+    #[error("Runtime error")]
+    RuntimeError,
     #[error("IO error: {0}")]
     IOError(#[from] std::io::Error),
 }
 
 pub trait ErrorReporter {
-    fn report(&mut self, err: Error) -> Result<(), Error>;
+    fn report(&mut self, err: LoxError) -> Result<(), LoxError>;
 }
