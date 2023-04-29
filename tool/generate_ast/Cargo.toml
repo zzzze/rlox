@@ -1,0 +1,19 @@
+[package]
+name = "generate_ast"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+prettyplease = "0.2.4"
+quote = "1.0.26"
+syn = "2.0.15"
+
+[dependencies.proc-macro2]
+version = "1.0.52"
+default-features = false
+
+[features]
+default = ["proc-macro"]
+proc-macro = ["proc-macro2/proc-macro"]
