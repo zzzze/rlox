@@ -94,9 +94,8 @@ mod tests {
         let mut output_buffer = Vec::new();
         let output: Rc<Mutex<&mut dyn Write>> = Rc::new(Mutex::new(&mut output_buffer));
         let mut interpreter = new(Rc::new(Mutex::new(&mut input)), output.clone(), MockExecuter(output.clone()));
-        let err = interpreter.exec(vec![String::from("a"), String::from("b"), String::from("c")]).err();
-        match err {
-            Some(LoxError::InvalidParameter) => (),
+        match interpreter.exec(vec![String::from("a"), String::from("b"), String::from("c")]).unwrap_err() {
+            LoxError::InvalidParameter => (),
             _ => panic!("Invalid error"),
         }
         assert_eq!(output_buffer, b"Usage: lox [script]\n");
