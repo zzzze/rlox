@@ -40,6 +40,17 @@ pub enum Literal {
     Nil,
 }
 
+impl std::fmt::Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Nil => write!(f, "nil"),
+            Self::String(literal) => write!(f, "{}", literal),
+            Self::Boolean(literal) => write!(f, "{}", literal),
+            Self::Number(literal) => write!(f, "{}", literal),
+        }
+    }
+}
+
 pub enum Value {
     Literal(Literal),
     Object(Box<dyn Object>),
@@ -48,7 +59,7 @@ pub enum Value {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     token_type: TokenType,
-    lexeme: String,
+    pub lexeme: String,
     literal: Literal,
     line: u32,
 }

@@ -43,36 +43,77 @@ fn parse_struct_info(definition: &str) -> Option<StructInfo> {
 }
 
 fn define_base_object(base_object_name: &str, variants: &Vec<&str>) -> TokenStream {
-    let struct_name = syn::Ident::new(base_object_name, Span::call_site());
-    let variants: Vec<Ident> = variants.iter().map(|item| {
-        syn::Ident::new(item, Span::call_site())
+    let struct_name = Ident::new(base_object_name, Span::call_site());
+    let variant_methods: Vec<TokenStream> = variants.iter().map(|item| {
+        let identifier = Ident::new(item, Span::call_site());
+        let identifier_lowercase = Ident::new(&item.to_lowercase(), Span::call_site());
+        quote!{
+            #struct_name::#identifier(#identifier_lowercase) => #identifier_lowercase.accept(visitor)
+        }
+    }).collect();
+    let variants: Vec<TokenStream> = variants.iter().map(|item| {
+        let identifier = Ident::new(item, Span::call_site());
+        quote!{#identifier(#identifier)}
     }).collect();
     let variants = quote!(#(#variants,)*);
     quote!{
         enum #struct_name {
             #variants
         }
+        impl #struct_name {
+            pub fn accept<'a, R>(&self, visitor: &'a mut dyn Visitor<R>) -> R {
+                match self {
+                    #(#variant_methods),*
+                }
+            }
+        }
     }
 }
 
-fn define_variant(name: &str, fields: &Vec<FieldInfo>) -> TokenStream {
-    let struct_name = syn::Ident::new(name, Span::call_site());
+fn define_variant(object_name: &str, variant_name: &str, fields: &Vec<FieldInfo>) -> TokenStream {
+    let variant_identifier = Ident::new(variant_name, Span::call_site());
     let field_exprs: Vec<TokenStream> = fields.iter().map(|field| {
-        let left = syn::Ident::new(field.field_name, Span::call_site());
-        let right = syn::Ident::new(field.field_type, Span::call_site());
+        let left = Ident::new(field.field_name, Span::call_site());
+        let right = {
+            let identifier = Ident::new(field.field_type, Span::call_site());
+            if object_name == field.field_type {
+                quote!{Box<#identifier>}
+            } else {
+                quote!{#identifier}
+            }
+        };
         quote!(#left: #right)
     }).collect();
-    let field_names: Vec<syn::Ident> = fields.iter().map(|field| {
+    let field_names: Vec<Ident> = fields.iter().map(|field| {
         syn::Ident::new(field.field_name, Span::call_site())
     }).collect();
+    let method_identifier = Ident::new(&format!("visit_{}_{}", variant_name.to_lowercase(), object_name.to_lowercase()), Span::call_site());
     quote!{
-        struct #struct_name {
-            #(#field_exprs),*
+        pub struct #variant_identifier {
+            #(pub #field_exprs),*
         }
-        impl #struct_name {
-            fn new(#(#field_exprs,)*) -> Self {
-                #struct_name { #(#field_names,)* }
+        impl #variant_identifier {
+            pub fn new(#(#field_exprs,)*) -> Self {
+                #variant_identifier { #(#field_names,)* }
             }
+
+            pub fn accept<'a, R>(&self, visitor: &'a mut dyn Visitor<R>) -> R {
+                visitor.#method_identifier(&self)
+            }
+        }
+    }
+}
+
+fn define_visitor_trait(object_name: &str, variant_names: &Vec<&str>) -> TokenStream {
+    let methods = variant_names.iter().map(|variant_name| {
+        let variant_identifier = Ident::new(variant_name, Span::call_site());
+        let variant_identifier_lowercase = Ident::new(&variant_name.to_lowercase(), Span::call_site());
+        let method_name = Ident::new(&format!("visit_{}_{}", &variant_name.to_lowercase(), &object_name.to_lowercase()), Span::call_site());
+        quote!(fn #method_name(&mut self, #variant_identifier_lowercase: &#variant_identifier) -> T)
+    }).collect::<Vec<TokenStream>>();
+    quote!{
+        pub trait Visitor<T> {
+            #(#methods;)*
         }
     }
 }
@@ -89,11 +130,13 @@ fn define_type(output_dir: PathBuf, file_info: FileInfo) -> Result<(), std::io::
     }).collect();
     let expr_enum = define_base_object(file_info.base_object_name, &expr_names);
     let expr_variants: Vec<TokenStream> = variants.iter().map(|variant| {
-        define_variant(&variant.name, &variant.fields)
+        define_variant(file_info.base_object_name, variant.name, &variant.fields)
     }).collect();
+    let visitor_trait = define_visitor_trait(file_info.base_object_name, &expr_names);
     let tokens = quote!{
         use crate::token::{Token, Literal as LoxLiteral};
-        #expr_enum
+        pub #expr_enum
+        #visitor_trait
         #(#expr_variants)*
     };
     let syntax_tree = parse_file(&tokens.to_string()).unwrap();
