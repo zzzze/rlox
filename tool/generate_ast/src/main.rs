@@ -84,8 +84,21 @@ fn define_variant(object_name: &str, variant_name: &str, fields: &Vec<FieldInfo>
         };
         quote!(#left: #right)
     }).collect();
-    let field_names: Vec<Ident> = fields.iter().map(|field| {
-        syn::Ident::new(field.field_name, Span::call_site())
+    let func_field_exprs: Vec<TokenStream> = fields.iter().map(|field| {
+        let left = Ident::new(field.field_name, Span::call_site());
+        let right = {
+            let identifier = Ident::new(field.field_type, Span::call_site());
+            quote!{#identifier}
+        };
+        quote!(#left: #right)
+    }).collect();
+    let struct_fields: Vec<TokenStream> = fields.iter().map(|field| {
+        let field_name = syn::Ident::new(field.field_name, Span::call_site());
+        if object_name == field.field_type {
+            quote!{#field_name: Box::new(#field_name)}
+        } else {
+            quote!{#field_name}
+        }
     }).collect();
     let method_identifier = Ident::new(&format!("visit_{}_{}", variant_name.to_lowercase(), object_name.to_lowercase()), Span::call_site());
     quote!{
@@ -93,8 +106,8 @@ fn define_variant(object_name: &str, variant_name: &str, fields: &Vec<FieldInfo>
             #(pub #field_exprs),*
         }
         impl #variant_identifier {
-            pub fn new(#(#field_exprs,)*) -> Self {
-                #variant_identifier { #(#field_names,)* }
+            pub fn new(#(#func_field_exprs,)*) -> Self {
+                #variant_identifier { #(#struct_fields,)* }
             }
 
             pub fn accept<'a, R>(&self, visitor: &'a mut dyn Visitor<R>) -> R {
