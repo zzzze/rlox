@@ -70,6 +70,7 @@ dependencies = [
 name = "generate_ast"
 version = "0.1.0"
 dependencies = [
+ "phf",
  "prettyplease",
  "proc-macro2",
  "quote",

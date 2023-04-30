@@ -18,10 +18,10 @@ fn main() {
     let output: Rc<Mutex<&mut dyn Write>> = Rc::new(Mutex::new(&mut stdout));
     let expression: Expr = Expr::Binary(Binary::new(
         Expr::Unary(Unary::new(
-            Token::new(TokenType::Minus, "-".to_string(), LiteralToken::Nil, 1),
+            Token::new(TokenType::Minus, "-", LiteralToken::Nil, 1),
             Expr::Literal(Literal::new(LiteralToken::Number(123f64))),
         )),
-        Token::new(TokenType::Star, "*".to_string(), LiteralToken::Nil, 1),
+        Token::new(TokenType::Star, "*", LiteralToken::Nil, 1),
         Expr::Grouping(Grouping::new(Expr::Literal(Literal::new(
             LiteralToken::Number(45.67f64),
         )))),

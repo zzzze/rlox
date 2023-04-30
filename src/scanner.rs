@@ -20,16 +20,16 @@ static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
     "while" => TokenType::While,
 };
 
-pub struct Scanner {
-    source: String,
-    tokens: Vec<Token>,
+pub struct Scanner<'a> {
+    source: &'a str,
+    tokens: Vec<Token<'a>>,
     start: usize,
     current: usize,
     line: u32,
 }
 
-impl Scanner {
-    pub fn new(source: String) -> Scanner {
+impl<'a> Scanner<'a> {
+    pub fn new(source: &'a str) -> Scanner<'a> {
         Scanner {
             source,
             tokens: Vec::new(),
@@ -44,7 +44,7 @@ impl Scanner {
             self.start = self.current;
             self.scan_token()?;
         }
-        self.tokens.push(Token::new(TokenType::EOF, "".to_string(), Literal::Nil, self.line));
+        self.tokens.push(Token::new(TokenType::EOF, "", Literal::Nil, self.line));
         Ok(self.tokens.clone())
     }
 
@@ -115,8 +115,8 @@ impl Scanner {
         }
     }
 
-    fn add_token(&mut self, token_type: TokenType, literal: Option<Literal>) -> Result<(), LoxError> {
-        let text = self.source[self.start..self.current].to_string();
+    fn add_token(&mut self, token_type: TokenType, literal: Option<Literal<'a>>) -> Result<(), LoxError> {
+        let text = &self.source[self.start..self.current];
         let token = if let Some(literal) = literal {
             Token::new(token_type, text, literal, self.line)
         } else {
@@ -181,7 +181,7 @@ impl Scanner {
         }
         // The closing ".
         self.advance();
-        let value = self.source[self.start + 1..self.current - 1].to_string();
+        let value = &self.source[self.start + 1..self.current - 1];
         self.add_token(TokenType::String, Some(Literal::String(value)))
     }
 
@@ -235,58 +235,58 @@ mod tests {
             and class else false for fun if nil or print return super this true var while
         ";
         let expected = vec![
-            Token::new(TokenType::LeftBrace, String::from("{"), Literal::Nil, 1),
-            Token::new(TokenType::Comma, String::from(","), Literal::Nil, 1),
-            Token::new(TokenType::Dot, String::from("."), Literal::Nil, 1),
-            Token::new(TokenType::Minus, String::from("-"), Literal::Nil, 1),
-            Token::new(TokenType::RightBrace, String::from("}"), Literal::Nil, 1),
-            Token::new(TokenType::LeftParen, String::from("("), Literal::Nil, 2),
-            Token::new(TokenType::Plus, String::from("+"), Literal::Nil, 2),
-            Token::new(TokenType::Star, String::from("*"), Literal::Nil, 2),
-            Token::new(TokenType::Semicolon, String::from(";"), Literal::Nil, 2),
-            Token::new(TokenType::RightParen, String::from(")"), Literal::Nil, 2),
-            Token::new(TokenType::Slash, String::from("/"), Literal::Nil, 4),
-            Token::new(TokenType::BangEqual, String::from("!="), Literal::Nil, 4),
-            Token::new(TokenType::EqualEqual, String::from("=="), Literal::Nil, 4),
-            Token::new(TokenType::Equal, String::from("="), Literal::Nil, 4),
-            Token::new(TokenType::Greater, String::from(">"), Literal::Nil, 4),
-            Token::new(TokenType::GreaterEqual, String::from(">="), Literal::Nil, 4),
-            Token::new(TokenType::Less, String::from("<"), Literal::Nil, 4),
-            Token::new(TokenType::LessEqual, String::from("<="), Literal::Nil, 4),
-            Token::new(TokenType::String, String::from("\"Hello\nWorld!!\""), Literal::String(String::from("Hello\nWorld!!")), 5),
-            Token::new(TokenType::Number, String::from("12.34"), Literal::Number(12.34), 5),
-            Token::new(TokenType::Or, String::from("or"), Literal::Nil, 5),
-            Token::new(TokenType::Comma, String::from(","), Literal::Nil, 5),
-            Token::new(TokenType::Identifier, String::from("hello_world"), Literal::Nil, 5),
-            Token::new(TokenType::Semicolon, String::from(";"), Literal::Nil, 5),
+            Token::new(TokenType::LeftBrace, "{", Literal::Nil, 1),
+            Token::new(TokenType::Comma, ",", Literal::Nil, 1),
+            Token::new(TokenType::Dot, ".", Literal::Nil, 1),
+            Token::new(TokenType::Minus, "-", Literal::Nil, 1),
+            Token::new(TokenType::RightBrace, "}", Literal::Nil, 1),
+            Token::new(TokenType::LeftParen, "(", Literal::Nil, 2),
+            Token::new(TokenType::Plus, "+", Literal::Nil, 2),
+            Token::new(TokenType::Star, "*", Literal::Nil, 2),
+            Token::new(TokenType::Semicolon, ";", Literal::Nil, 2),
+            Token::new(TokenType::RightParen, ")", Literal::Nil, 2),
+            Token::new(TokenType::Slash, "/", Literal::Nil, 4),
+            Token::new(TokenType::BangEqual, "!=", Literal::Nil, 4),
+            Token::new(TokenType::EqualEqual, "==", Literal::Nil, 4),
+            Token::new(TokenType::Equal, "=", Literal::Nil, 4),
+            Token::new(TokenType::Greater, ">", Literal::Nil, 4),
+            Token::new(TokenType::GreaterEqual, ">=", Literal::Nil, 4),
+            Token::new(TokenType::Less, "<", Literal::Nil, 4),
+            Token::new(TokenType::LessEqual, "<=", Literal::Nil, 4),
+            Token::new(TokenType::String, "\"Hello\nWorld!!\"", Literal::String("Hello\nWorld!!"), 5),
+            Token::new(TokenType::Number, "12.34", Literal::Number(12.34), 5),
+            Token::new(TokenType::Or, "or", Literal::Nil, 5),
+            Token::new(TokenType::Comma, ",", Literal::Nil, 5),
+            Token::new(TokenType::Identifier, "hello_world", Literal::Nil, 5),
+            Token::new(TokenType::Semicolon, ";", Literal::Nil, 5),
             // add, class, else, false, for, fun, if, nil, or, print, return, super, this, true, var, while
-            Token::new(TokenType::And, String::from("and"), Literal::Nil, 6),
-            Token::new(TokenType::Class, String::from("class"), Literal::Nil, 6),
-            Token::new(TokenType::Else, String::from("else"), Literal::Nil, 6),
-            Token::new(TokenType::False, String::from("false"), Literal::Nil, 6),
-            Token::new(TokenType::For, String::from("for"), Literal::Nil, 6),
-            Token::new(TokenType::Fun, String::from("fun"), Literal::Nil, 6),
-            Token::new(TokenType::If, String::from("if"), Literal::Nil, 6),
-            Token::new(TokenType::Nil, String::from("nil"), Literal::Nil, 6),
-            Token::new(TokenType::Or, String::from("or"), Literal::Nil, 6),
-            Token::new(TokenType::Print, String::from("print"), Literal::Nil, 6),
-            Token::new(TokenType::Return, String::from("return"), Literal::Nil, 6),
-            Token::new(TokenType::Super, String::from("super"), Literal::Nil, 6),
-            Token::new(TokenType::This, String::from("this"), Literal::Nil, 6),
-            Token::new(TokenType::True, String::from("true"), Literal::Nil, 6),
-            Token::new(TokenType::Var, String::from("var"), Literal::Nil, 6),
-            Token::new(TokenType::While, String::from("while"), Literal::Nil, 6),
+            Token::new(TokenType::And, "and", Literal::Nil, 6),
+            Token::new(TokenType::Class, "class", Literal::Nil, 6),
+            Token::new(TokenType::Else, "else", Literal::Nil, 6),
+            Token::new(TokenType::False, "false", Literal::Nil, 6),
+            Token::new(TokenType::For, "for", Literal::Nil, 6),
+            Token::new(TokenType::Fun, "fun", Literal::Nil, 6),
+            Token::new(TokenType::If, "if", Literal::Nil, 6),
+            Token::new(TokenType::Nil, "nil", Literal::Nil, 6),
+            Token::new(TokenType::Or, "or", Literal::Nil, 6),
+            Token::new(TokenType::Print, "print", Literal::Nil, 6),
+            Token::new(TokenType::Return, "return", Literal::Nil, 6),
+            Token::new(TokenType::Super, "super", Literal::Nil, 6),
+            Token::new(TokenType::This, "this", Literal::Nil, 6),
+            Token::new(TokenType::True, "true", Literal::Nil, 6),
+            Token::new(TokenType::Var, "var", Literal::Nil, 6),
+            Token::new(TokenType::While, "while", Literal::Nil, 6),
             // eof
-            Token::new(TokenType::EOF, String::from(""), Literal::Nil, 7),
+            Token::new(TokenType::EOF, "", Literal::Nil, 7),
         ];
-        let mut scanner = Scanner::new(source.to_string());
+        let mut scanner = Scanner::new(source);
         assert_eq!(scanner.scan_tokens().unwrap(), expected);
     }
 
     #[test]
     fn throw_unexpected_character() {
         let source = "；";
-        let mut scanner = Scanner::new(source.to_string());
+        let mut scanner = Scanner::new(source);
         match scanner.scan_tokens().unwrap_err() {
             LoxError::ParseError{line, message, ..} => {
                 assert_eq!(line, 1);
@@ -299,7 +299,7 @@ mod tests {
     #[test]
     fn throw_unterminated_string() {
         let source = "\"Hello World!!";
-        let mut scanner = Scanner::new(source.to_string());
+        let mut scanner = Scanner::new(source);
         match scanner.scan_tokens().unwrap_err() {
             LoxError::ParseError{line, message, ..} => {
                 assert_eq!(line, 1);

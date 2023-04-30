@@ -4,6 +4,17 @@ use proc_macro2::{TokenStream, Ident, Span};
 use quote::quote;
 use prettyplease::unparse;
 use std::{io::Write, path::PathBuf, vec};
+use phf::phf_map;
+
+static RENAME_MAP: phf::Map<&'static str, &'static str> = phf_map! {
+    "Literal" => "LoxLiteral",
+};
+
+static HAS_LIFETIME_OBJECTS: &[&'static str] = &[
+    "Expr",
+    "Token",
+    "LoxLiteral",
+];
 
 #[derive(Debug)]
 struct FieldInfo<'a> {
@@ -19,6 +30,7 @@ struct StructInfo<'a> {
 
 #[derive(Debug)]
 struct FileInfo<'a> {
+    dependencies: &'a[&'a str],
     base_object_name: &'a str,
     variant_info_list: Vec<&'a str>,
 }
@@ -42,32 +54,71 @@ fn parse_struct_info(definition: &str) -> Option<StructInfo> {
     None
 }
 
-fn define_base_object(base_object_name: &str, variants: &Vec<&str>) -> TokenStream {
+fn define_base_object(base_object_name: &str, variants: &Vec<StructInfo>) -> TokenStream {
     let struct_name = Ident::new(base_object_name, Span::call_site());
-    let variant_methods: Vec<TokenStream> = variants.iter().map(|item| {
-        let identifier = Ident::new(item, Span::call_site());
-        let identifier_lowercase = Ident::new(&item.to_lowercase(), Span::call_site());
+    let variant_names: Vec<&str> = variants.iter().map(|variant| {
+        variant.name
+    }).collect();
+    let has_lifetime = enum_has_lifetime(variants);
+    let variant_methods: Vec<TokenStream> = variant_names.iter().map(|variant_name| {
+        let identifier = Ident::new(variant_name, Span::call_site());
+        let identifier_lowercase = Ident::new(&variant_name.to_lowercase(), Span::call_site());
         quote!{
             #struct_name::#identifier(#identifier_lowercase) => #identifier_lowercase.accept(visitor)
         }
     }).collect();
-    let variants: Vec<TokenStream> = variants.iter().map(|item| {
-        let identifier = Ident::new(item, Span::call_site());
-        quote!{#identifier(#identifier)}
+    let variants: Vec<TokenStream> = variants.iter().map(|variant| {
+        let identifier = Ident::new(variant.name, Span::call_site());
+        if struct_has_lifetime(&variant.fields) {
+            quote!{#identifier(#identifier<'a>)}
+        } else {
+            quote!{#identifier(#identifier)}
+        }
     }).collect();
     let variants = quote!(#(#variants,)*);
-    quote!{
-        enum #struct_name {
-            #variants
+    if has_lifetime {
+        quote!{
+            enum #struct_name<'a> {
+                #variants
+            }
+            impl<'a> #struct_name<'a> {
+                pub fn accept<R>(&self, visitor: &'a mut dyn Visitor<R>) -> R {
+                    match self {
+                        #(#variant_methods),*
+                    }
+                }
+            }
         }
-        impl #struct_name {
-            pub fn accept<'a, R>(&self, visitor: &'a mut dyn Visitor<R>) -> R {
-                match self {
-                    #(#variant_methods),*
+    } else {
+        quote!{
+            enum #struct_name {
+                #variants
+            }
+            impl #struct_name {
+                pub fn accept<'a, R>(&self, visitor: &'a mut dyn Visitor<R>) -> R {
+                    match self {
+                        #(#variant_methods),*
+                    }
                 }
             }
         }
     }
+}
+
+fn field_has_lifetime(field: &FieldInfo) -> bool {
+    HAS_LIFETIME_OBJECTS.contains(&field.field_type)
+}
+
+fn struct_has_lifetime(fields: &Vec<FieldInfo>) -> bool {
+    fields.iter().any(|field| {
+        field_has_lifetime(field)
+    })
+}
+
+fn enum_has_lifetime(variants: &Vec<StructInfo>) -> bool {
+    variants.iter().any(|variant| {
+        struct_has_lifetime(&variant.fields)
+    })
 }
 
 fn define_variant(object_name: &str, variant_name: &str, fields: &Vec<FieldInfo>) -> TokenStream {
@@ -76,10 +127,15 @@ fn define_variant(object_name: &str, variant_name: &str, fields: &Vec<FieldInfo>
         let left = Ident::new(field.field_name, Span::call_site());
         let right = {
             let identifier = Ident::new(field.field_type, Span::call_site());
-            if object_name == field.field_type {
-                quote!{Box<#identifier>}
+            let identifier_expr = if field_has_lifetime(field) {
+                quote!{#identifier<'a>}
             } else {
                 quote!{#identifier}
+            };
+            if object_name == field.field_type {
+                quote!{Box<#identifier_expr>}
+            } else {
+                quote!{#identifier_expr}
             }
         };
         quote!(#left: #right)
@@ -88,7 +144,11 @@ fn define_variant(object_name: &str, variant_name: &str, fields: &Vec<FieldInfo>
         let left = Ident::new(field.field_name, Span::call_site());
         let right = {
             let identifier = Ident::new(field.field_type, Span::call_site());
-            quote!{#identifier}
+            if field_has_lifetime(field) {
+                quote!{#identifier<'a>}
+            } else {
+                quote!{#identifier}
+            }
         };
         quote!(#left: #right)
     }).collect();
@@ -101,17 +161,34 @@ fn define_variant(object_name: &str, variant_name: &str, fields: &Vec<FieldInfo>
         }
     }).collect();
     let method_identifier = Ident::new(&format!("visit_{}_{}", variant_name.to_lowercase(), object_name.to_lowercase()), Span::call_site());
-    quote!{
-        pub struct #variant_identifier {
-            #(pub #field_exprs),*
-        }
-        impl #variant_identifier {
-            pub fn new(#(#func_field_exprs,)*) -> Self {
-                #variant_identifier { #(#struct_fields,)* }
+    if struct_has_lifetime(fields) {
+        quote!{
+            pub struct #variant_identifier<'a> {
+                #(pub #field_exprs),*
             }
+            impl<'a> #variant_identifier<'a> {
+                pub fn new(#(#func_field_exprs,)*) -> Self {
+                    #variant_identifier { #(#struct_fields,)* }
+                }
 
-            pub fn accept<'a, R>(&self, visitor: &'a mut dyn Visitor<R>) -> R {
-                visitor.#method_identifier(&self)
+                pub fn accept<R>(&self, visitor: &'a mut dyn Visitor<R>) -> R {
+                    visitor.#method_identifier(&self)
+                }
+            }
+        }
+    } else {
+        quote!{
+            pub struct #variant_identifier {
+                #(pub #field_exprs),*
+            }
+            impl #variant_identifier {
+                pub fn new(#(#func_field_exprs,)*) -> Self {
+                    #variant_identifier { #(#struct_fields,)* }
+                }
+
+                pub fn accept<'a, R>(&self, visitor: &'a mut dyn Visitor<R>) -> R {
+                    visitor.#method_identifier(&self)
+                }
             }
         }
     }
@@ -131,6 +208,23 @@ fn define_visitor_trait(object_name: &str, variant_names: &Vec<&str>) -> TokenSt
     }
 }
 
+fn define_use_statements<'a>(dependencies: &'a[&'a str]) -> TokenStream {
+    let dependencies: Vec<TokenStream> = dependencies.iter().map(|dependency| {
+        let tokens: Vec<TokenStream> = dependency.split("::").enumerate().map(|(i, token_str)| {
+            let identifier = Ident::new(token_str, Span::call_site());
+            if i == dependencies.len() {
+                if let Some(name) = RENAME_MAP.get(&token_str) {
+                    let new_identifier = Ident::new(name, Span::call_site());
+                    return quote!(#identifier as #new_identifier);
+                }
+            }
+            quote!(#identifier)
+        }).collect();
+        quote!(use #(#tokens)::*)
+    }).collect();
+    quote!(#(#dependencies;)*)
+}
+
 fn define_type(output_dir: PathBuf, file_info: FileInfo) -> Result<(), std::io::Error> {
     let mut variants: Vec<StructInfo> = Vec::new();
     for variant_info_str in file_info.variant_info_list {
@@ -141,13 +235,14 @@ fn define_type(output_dir: PathBuf, file_info: FileInfo) -> Result<(), std::io::
     let expr_names: Vec<&str> = variants.iter().map(|variant| {
         variant.name
     }).collect();
-    let expr_enum = define_base_object(file_info.base_object_name, &expr_names);
+    let expr_enum = define_base_object(file_info.base_object_name, &variants);
     let expr_variants: Vec<TokenStream> = variants.iter().map(|variant| {
         define_variant(file_info.base_object_name, variant.name, &variant.fields)
     }).collect();
     let visitor_trait = define_visitor_trait(file_info.base_object_name, &expr_names);
+    let use_statements = define_use_statements(file_info.dependencies);
     let tokens = quote!{
-        use crate::token::{Token, Literal as LoxLiteral};
+        #use_statements
         pub #expr_enum
         #visitor_trait
         #(#expr_variants)*
@@ -180,6 +275,7 @@ fn main() {
     output_dir.push(output_path);
     let file_info_list = vec![
         FileInfo {
+            dependencies: &["crate::token::Token", "crate::token::Literal"],
             base_object_name: "Expr",
             variant_info_list: vec![
                 "Binary   : Expr left, Token operator, Expr right",

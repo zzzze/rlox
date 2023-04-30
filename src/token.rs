@@ -33,14 +33,14 @@ impl Clone for Box<dyn Object> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
-    String(String),
+pub enum Literal<'a> {
+    String(&'a str),
     Boolean(bool),
     Number(f64),
     Nil,
 }
 
-impl std::fmt::Display for Literal {
+impl<'a> std::fmt::Display for Literal<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Nil => write!(f, "nil"),
@@ -51,21 +51,21 @@ impl std::fmt::Display for Literal {
     }
 }
 
-pub enum Value {
-    Literal(Literal),
+pub enum Value<'a> {
+    Literal(Literal<'a>),
     Object(Box<dyn Object>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Token {
+pub struct Token<'a> {
     token_type: TokenType,
-    pub lexeme: String,
-    literal: Literal,
+    pub lexeme: &'a str,
+    literal: Literal<'a>,
     line: u32,
 }
 
-impl Token {
-    pub fn new(token_type: TokenType, lexeme: String, literal: Literal, line: u32) -> Token {
+impl<'a> Token<'a> {
+    pub fn new(token_type: TokenType, lexeme: &'a str, literal: Literal<'a>, line: u32) -> Token<'a> {
         Token {
             token_type,
             lexeme,
@@ -75,7 +75,7 @@ impl Token {
     }
 }
 
-impl Display for Token {
+impl<'a> Display for Token<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?} {} {:?}", self.token_type, self.lexeme, self.literal)
     }
