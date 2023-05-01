@@ -29,8 +29,8 @@ pub struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
-    pub fn new(source: &'a str) -> Scanner<'a> {
-        Scanner {
+    pub fn new(source: &'a str) -> Self {
+        Self {
             source,
             tokens: Vec::new(),
             start: 0,
@@ -40,7 +40,7 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn scan_tokens(&mut self) -> Result<Vec<Token>, LoxError> {
-        while !self.is_end() {
+        while !self.is_at_end() {
             self.start = self.current;
             self.scan_token()?;
         }
@@ -130,12 +130,12 @@ impl<'a> Scanner<'a> {
         self.source.chars().nth(self.current - 1).unwrap_or_default()
     }
 
-    fn is_end(&self) -> bool {
+    fn is_at_end(&self) -> bool {
         self.current >= self.source.len()
     }
 
     fn match_(&mut self, expected: char) -> bool {
-        if self.is_end() {
+        if self.is_at_end() {
             return false;
         }
         if self.source.chars().nth(self.current) != Some(expected) {
@@ -146,7 +146,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn peek(&self) -> char {
-        if self.is_end() {
+        if self.is_at_end() {
             return '\0'
         }
         return self.source.chars().nth(self.current).unwrap()
@@ -160,19 +160,19 @@ impl<'a> Scanner<'a> {
     }
 
     fn comment(&mut self) -> Result<(), LoxError> {
-        Ok(while self.peek() != '\n' && !self.is_end() {
+        Ok(while self.peek() != '\n' && !self.is_at_end() {
             self.advance();
         })
     }
 
     fn string(&mut self) -> Result<(), LoxError> {
-        while self.peek() != '"' && !self.is_end() {
+        while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
                 self.line += 1;
             }
             self.advance();
         }
-        if self.is_end() {
+        if self.is_at_end() {
             return Err(LoxError::ParseError {
                 line: self.line as usize,
                 where_: "".to_string(),

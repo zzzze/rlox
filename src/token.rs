@@ -58,9 +58,9 @@ pub enum Value<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token<'a> {
-    token_type: TokenType,
+    pub token_type: TokenType,
     pub lexeme: &'a str,
-    literal: Literal<'a>,
+    pub literal: Literal<'a>,
     line: u32,
 }
 
