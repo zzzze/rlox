@@ -134,3 +134,26 @@ impl<'a> Parser<'a> {
 
     fn consume(&self, _token_type: TokenType, _message: &'a str) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{token, ast_printer::AstPrinter};
+    use super::*;
+
+    #[test]
+    fn parse_expr() {
+        let tokens = vec![
+            token::Token::new(TokenType::Minus, "-", LoxLiteral::Nil, 1),
+            token::Token::new(TokenType::Number, "123", LoxLiteral::Number(123.0), 1),
+            token::Token::new(TokenType::Star, "*", LoxLiteral::Nil, 1),
+            token::Token::new(TokenType::LeftParen, "(", LoxLiteral::Nil, 1),
+            token::Token::new(TokenType::Number, "45.67", LoxLiteral::Number(45.67), 1),
+            token::Token::new(TokenType::RightParen, ")", LoxLiteral::Nil, 1),
+        ];
+        let parser = Parser::new(&tokens);
+        let expr = parser.expression();
+        let mut printer: AstPrinter = AstPrinter;
+        let result = printer.print(&expr);
+        assert_eq!(result, "(* (- 123) (group 45.67))");
+    }
+}
