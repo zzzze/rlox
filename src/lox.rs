@@ -8,19 +8,19 @@ use std::{
 };
 
 use super::error::LoxError;
-use super::executer::Executer;
+use super::runner::Runner;
 
-pub struct Lox<'a, T: Executer> {
+pub struct Lox<'a, T: Runner> {
     input: Rc<Mutex<&'a mut dyn BufRead>>,
     output: Rc<Mutex<&'a mut dyn Write>>,
     executer: T,
 }
 
-pub fn new <'a, T: Executer> (input: Rc<Mutex<&'a mut dyn BufRead>>, output: Rc<Mutex<&'a mut dyn Write>>, executer: T) -> Lox<'a, T> {
+pub fn new <'a, T: Runner> (input: Rc<Mutex<&'a mut dyn BufRead>>, output: Rc<Mutex<&'a mut dyn Write>>, executer: T) -> Lox<'a, T> {
     Lox { input, output, executer }
 }
 
-impl <'a, T: Executer> Lox<'a, T> {
+impl <'a, T: Runner> Lox<'a, T> {
     pub fn exec(&mut self, args: Vec<String>) -> Result<(), LoxError> {
         if args.len() > 2 {
             self.output.lock().unwrap().write_all(b"Usage: lox [script]\n").unwrap(); // FIXME
@@ -79,9 +79,9 @@ impl <'a, T: Executer> Lox<'a, T> {
 mod tests {
     use super::*;
 
-    struct MockExecuter<'a>(Rc<Mutex<&'a mut dyn Write>>);
+    struct MockRunner<'a>(Rc<Mutex<&'a mut dyn Write>>);
 
-    impl<'a> Executer for MockExecuter<'a> {
+    impl<'a> Runner for MockRunner<'a> {
         fn run(&mut self, source: String) -> Result<(), LoxError> {
             self.0.lock().unwrap().write_all(source.as_bytes())?;
             Ok(())
@@ -93,7 +93,7 @@ mod tests {
         let mut input = "".as_bytes();
         let mut output_buffer = Vec::new();
         let output: Rc<Mutex<&mut dyn Write>> = Rc::new(Mutex::new(&mut output_buffer));
-        let mut interpreter = new(Rc::new(Mutex::new(&mut input)), output.clone(), MockExecuter(output.clone()));
+        let mut interpreter = new(Rc::new(Mutex::new(&mut input)), output.clone(), MockRunner(output.clone()));
         match interpreter.exec(vec![String::from("a"), String::from("b"), String::from("c")]).unwrap_err() {
             LoxError::InvalidParameter => (),
             _ => panic!("Invalid error"),
@@ -109,7 +109,7 @@ mod tests {
         let mut tmpfile = tempfile::NamedTempFile::new().unwrap();
         tmpfile.write_all(b"hello\nworld").unwrap();
         let file_path = tmpfile.path().to_str().unwrap().to_string();
-        let mut interpreter = new(Rc::new(Mutex::new(&mut input)), output.clone(), MockExecuter(output.clone()));
+        let mut interpreter = new(Rc::new(Mutex::new(&mut input)), output.clone(), MockRunner(output.clone()));
         let err = interpreter.exec(vec![String::from("lox"), file_path]).err();
         assert_eq!(err.is_none(), true);
         assert_eq!(output_buffer, b"hello\nworld");
@@ -120,7 +120,7 @@ mod tests {
         let mut input = "hello\nworld\nexit".as_bytes();
         let mut output_buffer = Vec::new();
         let output: Rc<Mutex<&mut dyn Write>> = Rc::new(Mutex::new(&mut output_buffer));
-        let mut interpreter = new(Rc::new(Mutex::new(&mut input)), output.clone(), MockExecuter(output.clone()));
+        let mut interpreter = new(Rc::new(Mutex::new(&mut input)), output.clone(), MockRunner(output.clone()));
         let err = interpreter.exec(vec![]).err();
         assert_eq!(err.is_none(), true);
         assert_eq!(output_buffer, b"> hello> world> ");

@@ -1,5 +1,5 @@
 pub mod lox;
-pub mod executer;
+pub mod runner;
 pub mod error;
 pub mod token;
 pub mod scanner;

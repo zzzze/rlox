@@ -1,6 +1,6 @@
 use rlox::{
     ast_printer::AstPrinter,
-    error, executer,
+    error, runner,
     expr::{Binary, Expr, Grouping, Literal, Unary},
     lox,
     token::{Literal as LiteralToken, Token, TokenType},
@@ -35,7 +35,7 @@ fn main() {
     if let Err(err) = lox::new(
         input,
         output.clone(),
-        executer::EvalExecuter::new(output.clone()),
+        runner::LoxRunner::new(output.clone()),
     )
     .exec(std::env::args().collect())
     {
